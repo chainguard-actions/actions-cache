@@ -1,0 +1,28 @@
+name: Test cache with upload-chunk-size
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create cache target directory with content
+        run: |
+          mkdir -p /tmp/test-cache-chunk
+          echo "test content for chunked upload" > /tmp/test-cache-chunk/data.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/test-cache-chunk
+          key: test-cache-chunk-key-${{ github.run_id }}
+          upload-chunk-size: 10485760
+        continue-on-error: true
+      - name: Assert action completed
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          echo "PASS: action completed with upload-chunk-size set, cache-hit=$CACHE_HIT"

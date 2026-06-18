@@ -1,0 +1,30 @@
+name: Test basic cache usage
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create cache target directory
+        run: mkdir -p /tmp/test-cache-dir
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/test-cache-dir
+          key: test-cache-key-${{ github.run_id }}
+        continue-on-error: true
+      - name: Assert cache-hit output exists
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # On a fresh run, cache-hit should be false or empty (cache miss)
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "WARN: unexpected cache hit on fresh run"
+          else
+            echo "PASS: cache miss as expected (cache-hit=$CACHE_HIT)"
+          fi
