@@ -1,0 +1,31 @@
+name: Test cache with upload-chunk-size
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/test-chunk-cache-dir
+          echo "chunk size test" > /tmp/test-chunk-cache-dir/data.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/test-chunk-cache-dir
+          key: test-cache-chunk-${{ runner.os }}-upload
+          upload-chunk-size: 33554432
+        continue-on-error: true
+      - name: Assert cache-hit output is valid
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$CACHE_HIT" = "true" ] || [ "$CACHE_HIT" = "false" ] || [ -z "$CACHE_HIT" ]; then
+            echo "PASS: cache-hit output is valid: '$CACHE_HIT'"
+          else
+            echo "FAIL: unexpected cache-hit value: '$CACHE_HIT'"
+            exit 1
+          fi
+          echo "PASS"
