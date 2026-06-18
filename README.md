@@ -10,6 +10,7 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 |---------|-----|-----------------|
 | restore/v5.0.4 | [`restore/v5.0.4`](https://github.com/chainguard-actions/actions-cache/tree/restore/v5.0.4) | — |
 | save/v5.0.4 | [`save/v5.0.4`](https://github.com/chainguard-actions/actions-cache/tree/save/v5.0.4) | — |
+| v5.0.4 | [`v5.0.4`](https://github.com/chainguard-actions/actions-cache/tree/v5.0.4) | [`6682284`](https://github.com/actions/cache/commit/668228422ae6a00e4ad889ee87cd7109ec5666a7) |
 
 ## Privacy
 
