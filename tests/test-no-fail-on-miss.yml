@@ -1,0 +1,29 @@
+name: Test fail-on-cache-miss false (default)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create directory to cache
+        run: |
+          mkdir -p /tmp/cache-no-fail
+          echo "data" > /tmp/cache-no-fail/file.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-no-fail
+          key: test-no-fail-key-${{ runner.os }}-unique-12345
+          fail-on-cache-miss: 'false'
+        continue-on-error: true
+      - name: Assert step did not fail
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "step outcome: $OUTCOME"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "FAIL: action should not fail when fail-on-cache-miss is false"
+            exit 1
+          fi
+          echo "PASS: action completed without failure"

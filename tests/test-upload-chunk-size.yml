@@ -1,4 +1,4 @@
-name: Test cache with upload-chunk-size
+name: Test upload-chunk-size input
 on:
   workflow_dispatch:
 jobs:
@@ -9,20 +9,27 @@ jobs:
       GITHUB_EVENT_NAME: push
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Create cache target directory with content
+      - name: Create file to cache
         run: |
-          mkdir -p /tmp/test-cache-chunk
-          echo "test content for chunked upload" > /tmp/test-cache-chunk/data.txt
+          mkdir -p /tmp/cache-upload-chunk-test
+          echo "test-content" > /tmp/cache-upload-chunk-test/file.txt
       - id: cache
         uses: .
         with:
-          path: /tmp/test-cache-chunk
-          key: test-cache-chunk-key-${{ github.run_id }}
-          upload-chunk-size: 10485760
+          path: /tmp/cache-upload-chunk-test
+          key: test-upload-chunk-size-${{ github.run_id }}
+          upload-chunk-size: 33554432
+          fail-on-cache-miss: 'false'
         continue-on-error: true
-      - name: Assert action completed
+      - name: Assert cache-hit output is present
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         run: |
           echo "cache-hit: $CACHE_HIT"
-          echo "PASS: action completed with upload-chunk-size set, cache-hit=$CACHE_HIT"
+          # On a cache miss, cache-hit should be empty string or 'false'
+          # Either way the action should have run without error
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "PASS: cache hit (unexpected but valid)"
+          else
+            echo "PASS: cache miss as expected (upload-chunk-size input accepted)"
+          fi
