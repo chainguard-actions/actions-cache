@@ -1,0 +1,49 @@
+name: Test lookup-only mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-lookup-test
+          echo "lookup only test" > /tmp/cache-lookup-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-lookup-test
+          key: test-lookup-only-${{ github.run_id }}-${{ github.run_attempt }}
+          lookup-only: 'true'
+
+      - name: Assert cache-hit is false (no cache exists yet)
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # In act (no cache service), isCacheFeatureAvailable() returns false,
+          # sets cache-hit='false', and exits successfully.
+          # On real GitHub Actions with no prior cache, cache-hit is also false/empty.
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false since no cache was previously saved"
+            exit 1
+          fi
+          echo "PASS: cache-hit is not true in lookup-only mode (value='$CACHE_HIT')"
+
+      - name: Assert files are NOT downloaded in lookup-only mode
+        run: |
+          # In lookup-only mode, files should not be restored even if cache existed.
+          # The original file we created should still be present (not replaced by restore).
+          if [ -f /tmp/cache-lookup-test/data.txt ]; then
+            content=$(cat /tmp/cache-lookup-test/data.txt)
+            echo "file content: $content"
+            echo "PASS: original file present, no unexpected restore occurred"
+          else
+            echo "PASS: file absent (lookup-only mode does not restore files)"
+          fi

@@ -1,0 +1,32 @@
+name: Test fail-on-cache-miss false (default)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/fail-on-miss-test
+          echo "fail on cache miss test" > /tmp/fail-on-miss-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/fail-on-miss-test
+          key: test-no-fail-on-miss-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: 'false'
+
+      - name: Assert action did not fail on cache miss
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # The step should have succeeded (not failed) even with a cache miss
+          # If we reach here, the action did not fail — that's the expected behavior
+          echo "PASS: action completed without failing on cache miss (cache-hit='$CACHE_HIT')"

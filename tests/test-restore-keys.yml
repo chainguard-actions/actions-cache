@@ -1,33 +1,39 @@
-name: Test cache with restore-keys
+name: Test restore-keys fallback
 on:
   workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Create a file to cache
+
+      - name: Create a directory to cache
         run: |
-          mkdir -p /tmp/test-restore-cache-dir
-          echo "restore keys test" > /tmp/test-restore-cache-dir/data.txt
+          mkdir -p /tmp/cache-restore-keys-test
+          echo "restore keys test" > /tmp/cache-restore-keys-test/data.txt
+
       - id: cache
         uses: .
         with:
-          path: /tmp/test-restore-cache-dir
-          key: test-cache-restore-keys-${{ runner.os }}-specific
+          path: /tmp/cache-restore-keys-test
+          key: test-restore-keys-exact-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            test-cache-restore-keys-${{ runner.os }}-
-            test-cache-restore-keys-
-        continue-on-error: true
-      - name: Assert cache-hit output is valid
+            test-restore-keys-prefix-
+            test-restore-keys-
+
+      - name: Assert action completed with cache miss (restore-keys fallback attempted)
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         run: |
           echo "cache-hit: $CACHE_HIT"
-          if [ "$CACHE_HIT" = "true" ] || [ "$CACHE_HIT" = "false" ] || [ -z "$CACHE_HIT" ]; then
-            echo "PASS: cache-hit output is valid: '$CACHE_HIT'"
-          else
-            echo "FAIL: unexpected cache-hit value: '$CACHE_HIT'"
+          # In act (no cache service), isCacheFeatureAvailable() returns false,
+          # sets cache-hit='false', and exits successfully.
+          # On real GitHub Actions with no prior cache, cache-hit is also false/empty.
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false since no cache was previously saved"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: restore-keys accepted and action completed with cache miss (cache-hit='$CACHE_HIT')"

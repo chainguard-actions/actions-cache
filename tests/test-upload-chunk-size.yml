@@ -1,31 +1,35 @@
-name: Test cache with upload-chunk-size
+name: Test upload-chunk-size input
 on:
   workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@v4
+
       - name: Create a file to cache
         run: |
-          mkdir -p /tmp/test-chunk-cache-dir
-          echo "chunk size test" > /tmp/test-chunk-cache-dir/data.txt
+          mkdir -p /tmp/cache-upload-chunk-test
+          echo "cache-content-upload-chunk" > /tmp/cache-upload-chunk-test/data.txt
+
       - id: cache
         uses: .
         with:
-          path: /tmp/test-chunk-cache-dir
-          key: test-cache-chunk-${{ runner.os }}-upload
+          path: /tmp/cache-upload-chunk-test
+          key: test-upload-chunk-size-${{ runner.os }}-v1
           upload-chunk-size: 33554432
-        continue-on-error: true
-      - name: Assert cache-hit output is valid
+
+      - name: Assert cache-hit output is present
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         run: |
           echo "cache-hit: $CACHE_HIT"
-          if [ "$CACHE_HIT" = "true" ] || [ "$CACHE_HIT" = "false" ] || [ -z "$CACHE_HIT" ]; then
-            echo "PASS: cache-hit output is valid: '$CACHE_HIT'"
-          else
+          # cache-hit should be either 'true' or 'false' (or empty on miss)
+          if [ "$CACHE_HIT" != "true" ] && [ "$CACHE_HIT" != "false" ] && [ "$CACHE_HIT" != "" ]; then
             echo "FAIL: unexpected cache-hit value: '$CACHE_HIT'"
             exit 1
           fi
-          echo "PASS"
+          echo "PASS: upload-chunk-size accepted and cache step completed"

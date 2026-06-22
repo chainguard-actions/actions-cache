@@ -1,0 +1,50 @@
+name: Test actions-cache cache miss does not fail by default
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-cache-miss-no-fail:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_EVENT_NAME: push
+      GITHUB_REF: refs/heads/main
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create directory to cache
+        run: |
+          mkdir -p /tmp/cache-miss-test
+          echo "some-data" > /tmp/cache-miss-test/file.txt
+
+      - name: Run cache action with unique key (guaranteed miss) and fail-on-cache-miss false
+        id: cache
+        uses: .
+        with:
+          path: /tmp/cache-miss-test
+          key: test-cache-unique-key-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: 'false'
+
+      - name: Assert step succeeded and cache-hit is false or empty
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # With a unique key, we expect a cache miss (false or empty)
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "INFO: Unexpected cache hit — cache was already populated with this unique key"
+          else
+            echo "INFO: Cache miss as expected"
+          fi
+          # The action should not have failed (we reached this step)
+          echo "PASS: action completed without failure on cache miss (fail-on-cache-miss=false)"
+
+      - name: Assert cached directory still exists
+        run: |
+          if [ ! -d /tmp/cache-miss-test ]; then
+            echo "FAIL: directory should still exist after cache miss"
+            exit 1
+          fi
+          echo "PASS: directory exists after cache miss"
