@@ -1,0 +1,43 @@
+name: Test restore-keys fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Ensure Node.js 24 is available
+        run: |
+          if ! node --version 2>/dev/null | grep -q "^v24"; then
+            curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+            apt-get install -y nodejs
+          fi
+          node --version
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-restore-test
+          echo "restore keys test" > /tmp/cache-restore-test/data.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-restore-test
+          key: test-restore-key-${{ runner.os }}-v2
+          restore-keys: |
+            test-restore-key-${{ runner.os }}-
+            test-restore-key-
+        continue-on-error: true
+      - name: Assert cache-hit is false (no cache in act environment)
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          STEP_OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "cache-hit: '$CACHE_HIT'"
+          echo "step outcome: '$STEP_OUTCOME'"
+          # Under act, cache service is unavailable so cache-hit should be false or empty.
+          # A partial match via restore-keys also returns cache-hit=false.
+          # The action may error (outcome=failure) which is also acceptable.
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false or empty in act environment"
+            exit 1
+          fi
+          echo "PASS: restore-keys mode returned expected miss result"

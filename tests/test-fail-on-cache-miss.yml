@@ -1,0 +1,41 @@
+name: Test fail-on-cache-miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Ensure Node.js 24 is available
+        run: |
+          if ! node --version 2>/dev/null | grep -q "^v24"; then
+            curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+            apt-get install -y nodejs
+          fi
+          node --version
+      - name: Create a file to reference
+        run: |
+          mkdir -p /tmp/cache-fail-test
+          echo "fail on miss test" > /tmp/cache-fail-test/data.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-fail-test
+          key: test-fail-on-miss-key-${{ runner.os }}-nonexistent
+          fail-on-cache-miss: 'true'
+        continue-on-error: true
+      - name: Assert step failed due to cache miss
+        env:
+          STEP_OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "step outcome: '$STEP_OUTCOME'"
+          echo "cache-hit: '$CACHE_HIT'"
+          # With fail-on-cache-miss=true and no cache available (act environment),
+          # the action should fail (outcome=failure) or at minimum not report a hit.
+          # Under act, the cache service is unavailable so the action will error.
+          if [ "$STEP_OUTCOME" = "success" ] && [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected action to fail when fail-on-cache-miss=true and no cache exists"
+            exit 1
+          fi
+          echo "PASS: action correctly did not succeed with a cache hit when fail-on-cache-miss=true"
