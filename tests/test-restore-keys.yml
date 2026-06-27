@@ -1,0 +1,39 @@
+name: Test restore-keys fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a directory to cache
+        run: |
+          mkdir -p /tmp/cache-restore-keys
+          echo "restore keys test" > /tmp/cache-restore-keys/data.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-restore-keys
+          key: restore-keys-primary-${{ github.run_id }}-unique
+          restore-keys: |
+            restore-keys-fallback-
+            restore-keys-
+        continue-on-error: true
+      - name: Assert cache action completes with restore-keys configured
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          STEP_OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          echo "step outcome: $STEP_OUTCOME"
+          # The step should not hard-fail even when no cache is found
+          if [ "$STEP_OUTCOME" = "failure" ]; then
+            echo "FAIL: cache step with restore-keys should not fail on miss"
+            exit 1
+          fi
+          # With a unique primary key and no matching restore-keys, cache-hit should be false/empty
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected no exact cache hit for unique primary key"
+            exit 1
+          fi
+          echo "PASS: restore-keys scenario completed, cache-hit=$CACHE_HIT"

@@ -1,0 +1,37 @@
+name: Test lookup-only mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a directory to cache
+        run: |
+          mkdir -p /tmp/cache-lookup
+          echo "lookup test data" > /tmp/cache-lookup/data.txt
+      - id: cache-lookup
+        uses: .
+        with:
+          path: /tmp/cache-lookup
+          key: lookup-only-cache-key-${{ github.run_id }}-unique
+          lookup-only: 'true'
+        continue-on-error: true
+      - name: Assert lookup-only completes without error
+        env:
+          CACHE_HIT: ${{ steps.cache-lookup.outputs.cache-hit }}
+          STEP_OUTCOME: ${{ steps.cache-lookup.outcome }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          echo "step outcome: $STEP_OUTCOME"
+          # lookup-only should complete (success or skipped), not hard-fail
+          if [ "$STEP_OUTCOME" = "failure" ]; then
+            echo "FAIL: lookup-only step should not fail"
+            exit 1
+          fi
+          # cache-hit should be false or empty since this is a unique key
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected no cache hit for unique key in lookup-only mode"
+            exit 1
+          fi
+          echo "PASS: lookup-only completed with cache-hit=$CACHE_HIT"
