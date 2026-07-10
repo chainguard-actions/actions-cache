@@ -1,0 +1,34 @@
+name: Test multiple paths caching
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create multiple directories to cache
+        run: |
+          mkdir -p /tmp/cache-multi-a
+          mkdir -p /tmp/cache-multi-b
+          echo "data A" > /tmp/cache-multi-a/a.txt
+          echo "data B" > /tmp/cache-multi-b/b.txt
+      - id: cache
+        uses: .
+        with:
+          path: |
+            /tmp/cache-multi-a
+            /tmp/cache-multi-b
+          key: test-multi-path-${{ github.run_id }}-${{ github.run_attempt }}
+        continue-on-error: true
+      - name: Assert action ran without failure
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "step outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "FAIL: action failed when caching multiple paths"
+            exit 1
+          fi
+          echo "PASS: multiple paths cache action ran successfully"

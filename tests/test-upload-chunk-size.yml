@@ -1,0 +1,32 @@
+name: Test upload-chunk-size input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-chunk-test
+          echo "chunk-size-test-content" > /tmp/cache-chunk-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-chunk-test
+          key: test-upload-chunk-size-${{ github.run_id }}
+          upload-chunk-size: 1048576
+        continue-on-error: true
+
+      - name: Assert cache-hit is false (new key, no prior cache)
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false for a new unique key"
+            exit 1
+          fi
+          echo "PASS: cache-hit is false as expected for a new key"

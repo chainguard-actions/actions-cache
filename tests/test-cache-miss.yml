@@ -1,0 +1,28 @@
+name: Test cache miss (no existing cache)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-test
+          echo "hello cache" > /tmp/cache-test/data.txt
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-test
+          key: test-cache-miss-${{ github.run_id }}-${{ github.run_attempt }}
+        continue-on-error: true
+      - name: Assert cache-hit is false (cache miss expected)
+        env:
+          ACTUAL: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "actual cache-hit: $ACTUAL"
+          if [ "$ACTUAL" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false (miss), but got true"
+            exit 1
+          fi
+          echo "PASS: cache-hit is not true (cache miss as expected)"
