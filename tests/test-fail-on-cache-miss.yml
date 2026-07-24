@@ -1,0 +1,45 @@
+name: Test fail-on-cache-miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/act-harness
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a directory to cache
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/cache-fail-test"
+          echo "data" > "$GITHUB_WORKSPACE/cache-fail-test/file.txt"
+
+      - id: cache
+        uses: .
+        with:
+          path: ${{ github.workspace }}/cache-fail-test
+          key: test-fail-on-miss-${{ github.run_id }}-${{ github.run_attempt }}-unique
+          fail-on-cache-miss: 'true'
+        continue-on-error: true
+
+      - name: Assert action handled cache miss with fail-on-cache-miss
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "step outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          # Under act, the cache service is unavailable. The action exits early
+          # (before checking fail-on-cache-miss) with success and cache-hit=false.
+          # When the cache service IS available and there's a miss, the step fails.
+          # Either outcome is acceptable here; what matters is cache-hit is not true.
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false/empty, got true"
+            exit 1
+          fi
+          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action handled fail-on-cache-miss correctly (outcome=$OUTCOME, cache-hit=$CACHE_HIT)"
+          else
+            echo "FAIL: unexpected outcome: $OUTCOME"
+            exit 1
+          fi

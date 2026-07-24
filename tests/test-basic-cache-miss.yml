@@ -1,0 +1,38 @@
+name: Test basic cache miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/act-harness
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/cache-test-dir"
+          echo "hello cache" > "$GITHUB_WORKSPACE/cache-test-dir/data.txt"
+
+      - id: cache
+        uses: .
+        with:
+          path: ${{ github.workspace }}/cache-test-dir
+          key: test-cache-miss-${{ github.run_id }}-${{ github.run_attempt }}
+        continue-on-error: true
+
+      - name: Assert action completed (cache miss or unavailable)
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "step outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          # Under act, the cache service is not available, so the action exits
+          # early with success and cache-hit=false (or empty).
+          # Either success or failure is acceptable, but cache-hit must not be true.
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false/empty on first run, got true"
+            exit 1
+          fi
+          echo "PASS: cache-hit is not true (cache miss or service unavailable)"

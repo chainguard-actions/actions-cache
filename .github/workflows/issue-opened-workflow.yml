@@ -15,15 +15,22 @@ jobs:
       env:
         PAGERDUTY_TOKEN: ${{ secrets.PAGERDUTY_TOKEN }}
       run: |
-        raw=$(curl --request GET 'https://api.pagerduty.com/oncalls?include[]=users&schedule_ids[]=P5VG2BX&earliest=true' --header "Authorization: Token token=$PAGERDUTY_TOKEN" --header 'Accept: application/vnd.pagerduty+json;version=2' --header 'Content-Type: application/json' | jq -r '.oncalls[].user.name')
+        raw=$(curl --request GET 'https://api.pagerduty.com/oncalls?include[]=users&schedule_ids[]=P5VG2BX&earliest=true' \
+          --header "Authorization: Token token=$PAGERDUTY_TOKEN" \
+          --header 'Accept: application/vnd.pagerduty+json;version=2' \
+          --header 'Content-Type: application/json' | jq -r '.oncalls[].user.name')
         safe=$(printf '%s' "$raw" | tr -d '\n\r')
         echo "CURRENT=$safe" >> "$GITHUB_OUTPUT"
 
     - name: add_assignees
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        REPOSITORY: ${{ github.repository }}
+        REPO: ${{ github.repository }}
         ISSUE_NUMBER: ${{ github.event.issue.number }}
-        CURRENT_ONCALL: ${{ steps.oncall.outputs.CURRENT }}
+        ASSIGNEE: ${{ steps.oncall.outputs.CURRENT }}
       run: |
-        curl -X POST -H "Accept: application/vnd.github+json" -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/$REPOSITORY/issues/$ISSUE_NUMBER/assignees" -d "{\"assignees\":[\"$CURRENT_ONCALL\"]}"
+        curl -X POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "Authorization: Bearer $GITHUB_TOKEN" \
+          "https://api.github.com/repos/$REPO/issues/$ISSUE_NUMBER/assignees" \
+          -d "{\"assignees\":[\"$ASSIGNEE\"]}"

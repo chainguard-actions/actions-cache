@@ -16,17 +16,17 @@ jobs:
         uses: .
         with:
           path: /tmp/cache-chunk-test
-          key: test-upload-chunk-size-${{ github.run_id }}
+          key: test-upload-chunk-size-${{ runner.os }}-${{ github.run_id }}
           upload-chunk-size: 1048576
         continue-on-error: true
 
-      - name: Assert cache-hit is false (new key, no prior cache)
+      - name: Assert cache-hit is false (new unique key, no prior cache)
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         run: |
           echo "cache-hit: $CACHE_HIT"
           if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false for a new unique key"
+            echo "FAIL: expected cache-hit to be false for a unique key"
             exit 1
           fi
           echo "PASS: cache-hit is false as expected for a new key"

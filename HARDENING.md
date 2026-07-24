@@ -8,102 +8,119 @@
 
 **Test Policy SHA:** `843adf9e4b8f85d0c08b27b9d0b09dd094b54702`
 
-**Harden Agent Version:** `1`
+**Harden Agent Version:** `2`
 
-Action **actions--cache/v4.3.0** was hardened automatically. 4 finding(s) were identified and resolved across 2 iteration(s).
+Action **actions--cache/v4.3.0** was hardened automatically. 4 finding(s) were identified and resolved across 1 iteration(s).
 
 ## Findings Fixed
 
-### script-injection (severity: high)
-
-Rule (a): ${{ }} expressions are interpolated directly inside run: shell command strings. In issue-opened-workflow.yml, the run: blocks use ${{github.repository}}, ${{ github.event.issue.number}}, and ${{steps.oncall.outputs.CURRENT}} directly in shell commands. In pr-opened-workflow.yml, the run: blocks use ${{github.repository}}, ${{ github.event.pull_request.number}}, and ${{steps.oncall.outputs.CURRENT}} directly in shell commands. In licensed.yml, ${{ github.workspace }} is interpolated directly in a run: block. In workflow.yml, ${{ runner.os }} is interpolated directly in run: shell commands.
-
-Locations:
-
-- `.github/workflows/issue-opened-workflow.yml:12`
-- `.github/workflows/issue-opened-workflow.yml:16`
-- `.github/workflows/pr-opened-workflow.yml:11`
-- `.github/workflows/pr-opened-workflow.yml:15`
-- `.github/workflows/pr-opened-workflow.yml:20`
-- `.github/workflows/licensed.yml:34`
-- `.github/workflows/workflow.yml:27`
-- `.github/workflows/workflow.yml:30`
-- `.github/workflows/workflow.yml:52`
-- `.github/workflows/workflow.yml:57`
-
-### github-env-injection (severity: high)
-
-A run: block writes a value derived from an untrusted/external source to $GITHUB_OUTPUT without sanitization. In issue-opened-workflow.yml, the 'Get current oncall' step writes the result of a curl+jq pipeline (CURRENT=...) to $GITHUB_OUTPUT without applying printf '%s' ... | tr -d '\n\r'. In pr-opened-workflow.yml, the same pattern is used. The CURRENT value is then used unsanitized in subsequent run: steps via ${{steps.oncall.outputs.CURRENT}}.
-
-Locations:
-
-- `.github/workflows/issue-opened-workflow.yml:12`
-- `.github/workflows/pr-opened-workflow.yml:11`
-
 ### unpinned-uses (severity: high)
 
-Multiple workflow files reference actions using mutable tags or branch names instead of full 40-character SHA commit digests. Failing references: check-dist.yml: actions/reusable-workflows/.github/workflows/check-dist.yml@main (branch). close-inactive-issues.yml: actions/stale@v9 (tag). codeql.yml: actions/checkout@v4, github/codeql-action/init@v3, github/codeql-action/autobuild@v3, github/codeql-action/analyze@v3 (tags). licensed.yml: actions/checkout@v4, ruby/setup-ruby@v1 (tags). publish-immutable-actions.yml: actions/checkout@v4, actions/publish-immutable-action@0.0.3 (tags). release-new-action-version.yml: actions/publish-action@v0.3.0 (tag). workflow.yml: actions/checkout@v4, actions/setup-node@v4 (tags).
+Multiple workflow files reference actions using mutable tags or branch names instead of pinned 40-character commit SHAs, making them vulnerable to supply-chain attacks.
+
+- check-dist.yml: `actions/reusable-workflows/.github/workflows/check-dist.yml@main` (branch ref)
+- close-inactive-issues.yml: `actions/stale@v9`
+- codeql.yml: `actions/checkout@v4`, `github/codeql-action/init@v3`, `github/codeql-action/autobuild@v3`, `github/codeql-action/analyze@v3`
+- licensed.yml: `actions/checkout@v4`, `ruby/setup-ruby@v1`
+- publish-immutable-actions.yml: `actions/checkout@v4`, `actions/publish-immutable-action@0.0.3`
+- release-new-action-version.yml: `actions/publish-action@v0.3.0`
+- workflow.yml: `actions/checkout@v4`, `actions/setup-node@v4`
 
 Locations:
 
-- `.github/workflows/check-dist.yml:9`
+- `.github/workflows/check-dist.yml:13`
 - `.github/workflows/close-inactive-issues.yml:10`
-- `.github/workflows/codeql.yml:18`
-- `.github/workflows/codeql.yml:23`
+- `.github/workflows/codeql.yml:17`
+- `.github/workflows/codeql.yml:22`
 - `.github/workflows/codeql.yml:30`
-- `.github/workflows/codeql.yml:40`
-- `.github/workflows/licensed.yml:18`
-- `.github/workflows/licensed.yml:22`
-- `.github/workflows/publish-immutable-actions.yml:14`
-- `.github/workflows/publish-immutable-actions.yml:17`
+- `.github/workflows/codeql.yml:43`
+- `.github/workflows/licensed.yml:16`
+- `.github/workflows/licensed.yml:20`
+- `.github/workflows/publish-immutable-actions.yml:16`
+- `.github/workflows/publish-immutable-actions.yml:19`
 - `.github/workflows/release-new-action-version.yml:22`
-- `.github/workflows/workflow.yml:21`
-- `.github/workflows/workflow.yml:23`
+- `.github/workflows/workflow.yml:22`
+- `.github/workflows/workflow.yml:24`
+
+### script-injection (severity: high)
+
+Multiple workflow run: blocks directly interpolate GitHub Actions expressions (${{ ... }}) into shell commands, violating rule (a). This allows template substitution to inject arbitrary shell metacharacters before the shell parses the command.
+
+- workflow.yml: `${{ runner.os }}` is interpolated directly into shell run: commands passed as arguments to test scripts (e.g., `run: __tests__/create-cache-files.sh ${{ runner.os }} test-cache`).
+- licensed.yml: `${{ github.workspace }}` is interpolated directly into a `cd` command in a run: block.
+- issue-opened-workflow.yml: `${{github.repository}}`, `${{ github.event.issue.number}}`, and `${{steps.oncall.outputs.CURRENT}}` are all interpolated directly into a curl command in a run: block.
+- pr-opened-workflow.yml: `${{github.repository}}`, `${{ github.event.pull_request.number}}`, and `${{steps.oncall.outputs.CURRENT}}` are interpolated directly into curl commands in run: blocks. This workflow is triggered by `pull_request_target`, making `github.event.pull_request.*` attacker-controlled.
+
+Locations:
+
+- `.github/workflows/workflow.yml:30`
+- `.github/workflows/workflow.yml:33`
+- `.github/workflows/workflow.yml:55`
+- `.github/workflows/workflow.yml:58`
+- `.github/workflows/licensed.yml:33`
+- `.github/workflows/issue-opened-workflow.yml:15`
+- `.github/workflows/pr-opened-workflow.yml:15`
+- `.github/workflows/pr-opened-workflow.yml:18`
+- `.github/workflows/pr-opened-workflow.yml:21`
 
 ### missing-permissions (severity: medium)
 
-Several workflow files have no top-level permissions: key and no job-level permissions: blocks, meaning they run with the default (potentially broad) token permissions. Affected files: check-dist.yml (delegates to reusable workflow with no permissions set), issue-opened-workflow.yml (no permissions at any level), licensed.yml (no permissions at any level), workflow.yml (no permissions at any level).
+Several workflow files have no top-level `permissions:` key and no job-level `permissions:` key on any of their jobs. Without explicit permissions, workflows inherit the default repository permissions (which may be broad), violating the principle of least privilege.
+
+- workflow.yml: No top-level or job-level permissions defined across all jobs (build, test-save, test-restore, test-proxy-save, test-proxy-restore).
+- check-dist.yml: No top-level or job-level permissions defined.
+- licensed.yml: No top-level or job-level permissions defined.
+- issue-opened-workflow.yml: No top-level or job-level permissions defined.
+- pr-opened-workflow.yml: No top-level or job-level permissions defined (especially concerning as it is triggered by `pull_request_target`).
 
 Locations:
 
-- `.github/workflows/check-dist.yml:1`
-- `.github/workflows/issue-opened-workflow.yml:1`
-- `.github/workflows/licensed.yml:1`
 - `.github/workflows/workflow.yml:1`
+- `.github/workflows/check-dist.yml:1`
+- `.github/workflows/licensed.yml:1`
+- `.github/workflows/issue-opened-workflow.yml:1`
+- `.github/workflows/pr-opened-workflow.yml:1`
+
+### github-env-injection (severity: high)
+
+In issue-opened-workflow.yml and pr-opened-workflow.yml, the 'Get current oncall' step writes the output of a curl+jq pipeline directly to $GITHUB_OUTPUT without sanitization (`echo "CURRENT=$(curl ... | jq -r '.oncalls[].user.name')" >> $GITHUB_OUTPUT`). The value from the external API response may contain newlines or special characters that could inject additional key=value pairs into the GITHUB_OUTPUT file, which are then consumed by subsequent steps. No `printf '%s' ... | tr -d '\n\r'` sanitization is applied before the write.
+
+Locations:
+
+- `.github/workflows/issue-opened-workflow.yml:11`
+- `.github/workflows/pr-opened-workflow.yml:11`
 
 ## Iteration Notes
 
 ### Iteration 1
 
-**Fixes applied:** script-injection, github-env-injection, unpinned-uses, missing-permissions
+**Fixes applied:** unpinned-uses, script-injection, missing-permissions, github-env-injection
 
 **Notes:**
 
-Fixed all four finding types across 9 workflow files:
+Fixed all findings across 8 workflow files:
 
-1. script-injection: Moved all ${{ }} expressions out of run: shell strings into env: blocks in issue-opened-workflow.yml, pr-opened-workflow.yml, licensed.yml (replaced ${{ github.workspace }} with $GITHUB_WORKSPACE env var), and workflow.yml (moved runner.os to RUNNER_OS env var).
+**unpinned-uses**: Pinned all action references to full 40-char SHAs:
+- check-dist.yml: actions/reusable-workflows@main → @4735e71081024a944852f4ab9d1495b6dd2de8f2
+- close-inactive-issues.yml: actions/stale@v9 → @5bef64f19d7facfb25b37b414482c7164d639639
+- codeql.yml: actions/checkout@v4 → @11d596..., github/codeql-action/{init,autobuild,analyze}@v3 → @4187e74...
+- licensed.yml: actions/checkout@v4 → @11d596..., ruby/setup-ruby@v1 → @95ef2b0...
+- publish-immutable-actions.yml: actions/checkout@v4 → @11d596..., actions/publish-immutable-action@0.0.3 → @4b1aa5c... (resolved as v0.0.3)
+- release-new-action-version.yml: actions/publish-action@v0.3.0 → @f784495...
+- workflow.yml: actions/checkout@v4 → @11d596..., actions/setup-node@v4 → @49933ea...
 
-2. github-env-injection: In both issue-opened-workflow.yml and pr-opened-workflow.yml, sanitized the curl+jq output before writing to $GITHUB_OUTPUT using: raw=$(...); safe=$(printf '%s' "$raw" | tr -d '\n\r'); echo "CURRENT=$safe" >> "$GITHUB_OUTPUT".
+**script-injection**: Moved all ${{ }} expressions out of run: blocks into env: blocks:
+- workflow.yml: ${{ runner.os }} moved to RUNNER_OS env var in test-save/test-restore jobs
+- licensed.yml: ${{ github.workspace }} moved to WORKSPACE env var
+- issue-opened-workflow.yml: All github context expressions moved to env vars
+- pr-opened-workflow.yml: All github context expressions moved to env vars
 
-3. unpinned-uses: Pinned all action references to full 40-character SHA digests:
-   - actions/checkout@v4 → @34e114876b0b11c390a56381ad16ebd13914f8d5
-   - actions/setup-node@v4 → @49933ea5288caeca8642d1e84afbd3f7d6820020
-   - actions/stale@v9 → @5bef64f19d7facfb25b37b414482c7164d639639
-   - github/codeql-action/init@v3 → @02c5e83432fe5497fd85b873b6c9f16a8578e1d9
-   - github/codeql-action/autobuild@v3 → @02c5e83432fe5497fd85b873b6c9f16a8578e1d9
-   - github/codeql-action/analyze@v3 → @02c5e83432fe5497fd85b873b6c9f16a8578e1d9
-   - ruby/setup-ruby@v1 → @d45b1a4e94b71acab930e56e79c6aa188764e7f9
-   - actions/publish-immutable-action@0.0.3 → @4b1aa5c1cde5fedc80d52746c9546cb5560e5f53 (resolved as v0.0.3)
-   - actions/publish-action@v0.3.0 → @f784495ce78a41bac4ed7e34a73f0034015764bb
-   - actions/reusable-workflows@main → @4735e71081024a944852f4ab9d1495b6dd2de8f2
+**missing-permissions**: Added top-level permissions blocks:
+- workflow.yml: permissions: contents: read
+- check-dist.yml: permissions: contents: read
+- licensed.yml: permissions: contents: read
+- issue-opened-workflow.yml: permissions: issues: write
+- pr-opened-workflow.yml: permissions: pull-requests: write
 
-4. missing-permissions: Added top-level permissions blocks to check-dist.yml (contents: read), issue-opened-workflow.yml (issues: write), licensed.yml (contents: read), and workflow.yml (contents: read).
-
-### Iteration 2
-
-**Fixes applied:** missing-permissions
-
-**Notes:**
-
-Added a top-level `permissions: pull-requests: write` block to `.github/workflows/pr-opened-workflow.yml`. The workflow uses `pull_request_target` and makes API calls to request reviewers and add assignees to PRs, both of which require `pull-requests: write`. No other permissions are needed, so all other permissions default to `none`, satisfying the principle of least privilege.
+**github-env-injection**: Sanitized GITHUB_OUTPUT writes in issue-opened-workflow.yml and pr-opened-workflow.yml using printf '%s' | tr -d '\n\r' before writing the oncall value.
 
