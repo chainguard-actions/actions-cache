@@ -1,0 +1,32 @@
+name: Test fail-on-cache-miss false (default)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a directory to cache
+        run: |
+          mkdir -p /tmp/cache-no-fail-test
+          echo "no fail test" > /tmp/cache-no-fail-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-no-fail-test
+          key: test-no-fail-unique-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: 'false'
+
+      - name: Assert action succeeded with cache miss and fail-on-cache-miss false
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # The action should succeed (not fail) even on cache miss when fail-on-cache-miss is false
+          # cache-hit should be false or empty since we used a unique key
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "WARN: unexpected cache hit for unique key (run may have been retried)"
+          fi
+          echo "PASS: action completed without failure on cache miss"

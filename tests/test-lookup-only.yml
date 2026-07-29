@@ -1,0 +1,40 @@
+name: Test lookup-only mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-lookup-test
+          echo "lookup only test" > /tmp/cache-lookup-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-lookup-test
+          key: test-lookup-only-${{ github.run_id }}-${{ github.run_attempt }}
+          lookup-only: 'true'
+
+      - name: Assert cache-hit is false (no prior cache for unique key)
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # With a unique key, cache-hit should be false or empty
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected no cache hit for unique key in lookup-only mode"
+            exit 1
+          fi
+          echo "PASS: no cache hit as expected in lookup-only mode"
+
+      - name: Assert file still exists (lookup-only should not remove local files)
+        run: |
+          if [ ! -f /tmp/cache-lookup-test/data.txt ]; then
+            echo "FAIL: local file should still exist after lookup-only"
+            exit 1
+          fi
+          echo "PASS: local file still present after lookup-only"

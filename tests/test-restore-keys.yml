@@ -1,0 +1,34 @@
+name: Test restore-keys fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a directory to cache
+        run: |
+          mkdir -p /tmp/cache-restore-keys-test
+          echo "restore keys test" > /tmp/cache-restore-keys-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-restore-keys-test
+          key: test-restore-keys-exact-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            test-restore-keys-prefix-
+            test-restore-keys-
+
+      - name: Assert action completed successfully with restore-keys configured
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          # With a unique exact key and no prior cache, cache-hit should be false
+          # The action should still succeed (restore-keys are just fallbacks)
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "WARN: unexpected exact cache hit for unique key"
+          fi
+          echo "PASS: action completed with restore-keys configured"
