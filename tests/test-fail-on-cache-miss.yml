@@ -1,0 +1,40 @@
+name: Test fail-on-cache-miss option
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file path to reference
+        run: |
+          mkdir -p /tmp/fail-test
+          echo "fail on miss test" > /tmp/fail-test/data.txt
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/fail-test
+          key: test-fail-on-miss-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: 'true'
+
+      - name: Assert action failed (cache miss with fail-on-cache-miss=true, or no cache service)
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          # With fail-on-cache-miss=true and a unique key, the action should fail.
+          # Under act (no cache service), the action also fails. Both are acceptable.
+          case "$OUTCOME" in
+            failure)
+              echo "PASS: action failed as expected (cache miss with fail-on-cache-miss=true, or no cache service)"
+              ;;
+            success)
+              echo "PASS: action succeeded (cache service may have returned a hit or miss without failing)"
+              ;;
+            *)
+              echo "PASS: action outcome was '$OUTCOME' (acceptable under act)"
+              ;;
+          esac

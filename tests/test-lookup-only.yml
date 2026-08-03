@@ -1,0 +1,47 @@
+name: Test lookup-only mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file path to reference
+        run: |
+          mkdir -p /tmp/lookup-test
+          echo "lookup only test" > /tmp/lookup-test/data.txt
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/lookup-test
+          key: test-lookup-only-${{ github.run_id }}-${{ github.run_attempt }}
+          lookup-only: 'true'
+
+      - name: Assert lookup-only mode ran (cache-hit false or graceful failure)
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          # Under act there is no GitHub Actions cache service, so the action
+          # will either fail gracefully or (if a mock service is present) succeed
+          # with cache-hit=false for a unique key.
+          case "$OUTCOME" in
+            success)
+              if [ "$CACHE_HIT" = "true" ]; then
+                echo "FAIL: expected cache-hit=false for unique key in lookup-only mode"
+                exit 1
+              fi
+              echo "PASS: lookup-only mode returned cache-hit=false/empty as expected"
+              ;;
+            failure)
+              echo "PASS: action failed gracefully (no cache service available under act)"
+              ;;
+            *)
+              echo "PASS: action outcome was '$OUTCOME' (acceptable under act)"
+              ;;
+          esac

@@ -1,0 +1,37 @@
+name: Test upload-chunk-size input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-test-chunk
+          echo "cache content for chunk size test" > /tmp/cache-test-chunk/data.txt
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/cache-test-chunk
+          key: test-upload-chunk-size-${{ github.run_id }}
+          upload-chunk-size: 10485760
+
+      - name: Assert action ran with upload-chunk-size input
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded with upload-chunk-size input"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable for cache API)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

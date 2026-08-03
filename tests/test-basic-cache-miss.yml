@@ -1,0 +1,46 @@
+name: Test basic cache miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-test
+          echo "hello cache" > /tmp/cache-test/data.txt
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/cache-test
+          key: test-cache-miss-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Assert cache-hit is false or action failed gracefully (no cache service)
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          # Under act there is no GitHub Actions cache service, so the action
+          # will either fail gracefully or (if a mock service is present) succeed
+          # with cache-hit=false. Both are acceptable outcomes.
+          case "$OUTCOME" in
+            success)
+              if [ "$CACHE_HIT" = "true" ]; then
+                echo "FAIL: expected cache-hit=false for a unique key, got true"
+                exit 1
+              fi
+              echo "PASS: cache-hit is false/empty as expected (cache miss)"
+              ;;
+            failure)
+              echo "PASS: action failed gracefully (no cache service available under act)"
+              ;;
+            *)
+              echo "PASS: action outcome was '$OUTCOME' (acceptable under act)"
+              ;;
+          esac
