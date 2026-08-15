@@ -6,6 +6,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Generate unique cache key
+        id: gen-key
+        run: echo "key=test-cache-miss-$(date +%s%N)-$$" >> "$GITHUB_OUTPUT"
       - name: Create a file to cache
         run: |
           mkdir -p /tmp/cache-test
@@ -14,16 +17,20 @@ jobs:
         uses: .
         with:
           path: /tmp/cache-test
-          key: test-cache-key-${{ runner.os }}-basic
+          key: ${{ steps.gen-key.outputs.key }}
         continue-on-error: true
-      - name: Assert cache-hit is false on first run
+      - name: Assert cache-hit is not true (new unique key = cache miss)
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
         run: |
           echo "cache-hit: $CACHE_HIT"
-          # On a fresh run with no prior cache, cache-hit should be false or empty
+          echo "outcome: $OUTCOME"
+          # With a unique key, cache-hit must NOT be "true".
+          # In act without cache service: action exits early with cache-hit=false (success).
+          # In act with local cache service: cache miss, cache-hit not set (step may succeed or fail).
           if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false or empty on first run"
+            echo "FAIL: expected cache-hit to be false for a unique key"
             exit 1
           fi
-          echo "PASS: cache-hit is not true (expected on cache miss)"
+          echo "PASS: cache-hit is not true as expected for a new unique key"

@@ -6,34 +6,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Create directory to reference
+      - name: Generate unique cache key
+        id: gen-key
+        run: echo "key=test-lookup-only-$(date +%s%N)-$$" >> "$GITHUB_OUTPUT"
+      - name: Ensure cache target directory does not exist
         run: |
-          mkdir -p /tmp/cache-lookup
-          echo "lookup test" > /tmp/cache-lookup/data.txt
+          rm -rf /tmp/cache-lookup-test
       - id: cache
         uses: .
         with:
-          path: /tmp/cache-lookup
-          key: test-lookup-only-key-${{ runner.os }}-99999
+          path: /tmp/cache-lookup-test
+          key: ${{ steps.gen-key.outputs.key }}
           lookup-only: 'true'
         continue-on-error: true
-      - name: Assert lookup-only completed
+      - name: Assert cache-hit is not true for unique key in lookup-only mode
         env:
-          OUTCOME: ${{ steps.cache.outcome }}
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
         run: |
-          echo "step outcome: $OUTCOME"
           echo "cache-hit: $CACHE_HIT"
-          # In act environment, cache service is not available so the step may
-          # succeed or fail gracefully; it should not be a hard crash
-          if [ "$OUTCOME" = "failure" ]; then
-            echo "INFO: step failed (expected in act without cache service)"
-          else
-            echo "PASS: lookup-only completed with outcome: $OUTCOME"
-          fi
-          # The key assertion: cache-hit should not be 'true' since no cache was saved
+          echo "outcome: $OUTCOME"
+          # With a unique key, cache-hit must NOT be "true".
           if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: cache-hit should not be true for a key that was never saved"
+            echo "FAIL: expected cache-hit to be false for a unique key"
             exit 1
           fi
-          echo "PASS: cache-hit is not true"
+          echo "PASS: cache-hit is not true as expected"
+      - name: Assert path was not populated (lookup-only does not download)
+        run: |
+          if [ -d /tmp/cache-lookup-test ]; then
+            echo "FAIL: directory should not exist since lookup-only does not download"
+            exit 1
+          fi
+          echo "PASS: path not populated in lookup-only mode"
