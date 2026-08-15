@@ -4,42 +4,45 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/act-harness
+      GITHUB_EVENT_NAME: push
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Ensure Node.js 24 is available
-        run: |
-          if ! node --version 2>/dev/null | grep -q "^v24"; then
-            curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-            apt-get install -y nodejs
-          fi
-          node --version
-      - name: Create a file to reference
+
+      - name: Create a file to cache
         run: |
           mkdir -p /tmp/cache-lookup-test
           echo "lookup only test" > /tmp/cache-lookup-test/data.txt
+
       - id: cache
         uses: .
+        continue-on-error: true
         with:
           path: /tmp/cache-lookup-test
-          key: test-lookup-only-key-${{ runner.os }}
+          key: test-lookup-only-${{ github.run_id }}-${{ github.run_attempt }}
           lookup-only: 'true'
-        continue-on-error: true
-      - name: Assert cache-hit is false (no cache in act environment)
+
+      - name: Assert cache-hit is not true (no prior cache, lookup-only mode)
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
-          STEP_OUTCOME: ${{ steps.cache.outcome }}
+          OUTCOME: ${{ steps.cache.outcome }}
         run: |
-          echo "cache-hit: '$CACHE_HIT'"
-          echo "step outcome: '$STEP_OUTCOME'"
-          # Under act, cache service is unavailable so cache-hit should be false or empty.
-          # The action may error (outcome=failure) which is also acceptable.
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          # In lookup-only mode with no existing cache, cache-hit should be false or empty.
+          # Under act, cache service may not be available; action may exit early.
+          # Either way, cache-hit must NOT be "true".
           if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false or empty in act environment"
+            echo "FAIL: expected cache-hit to be false or empty in lookup-only mode with no prior cache"
             exit 1
           fi
-          echo "PASS: lookup-only mode returned expected miss result"
-      - name: Assert file was NOT downloaded (lookup-only should not restore)
+          echo "PASS: cache-hit is not true as expected in lookup-only mode (value: '$CACHE_HIT', outcome: '$OUTCOME')"
+
+      - name: Assert original file still exists (lookup-only does not delete files)
         run: |
-          # In lookup-only mode, even if cache existed, it would not be downloaded.
-          # We just verify the assertion step completed without error.
-          echo "PASS: lookup-only mode completed without downloading"
+          if [ ! -f /tmp/cache-lookup-test/data.txt ]; then
+            echo "FAIL: file should still exist after lookup-only cache check"
+            exit 1
+          fi
+          echo "PASS: file exists after lookup-only"

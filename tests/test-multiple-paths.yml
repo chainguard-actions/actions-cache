@@ -1,4 +1,4 @@
-name: Test basic cache miss
+name: Test multiple paths caching
 on:
   workflow_dispatch:
 jobs:
@@ -10,17 +10,21 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Create a file to cache
+      - name: Create multiple files to cache
         run: |
-          mkdir -p /tmp/cache-test
-          echo "hello cache" > /tmp/cache-test/data.txt
+          mkdir -p /tmp/cache-multi-a
+          mkdir -p /tmp/cache-multi-b
+          echo "file a" > /tmp/cache-multi-a/a.txt
+          echo "file b" > /tmp/cache-multi-b/b.txt
 
       - id: cache
         uses: .
         continue-on-error: true
         with:
-          path: /tmp/cache-test
-          key: test-cache-miss-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            /tmp/cache-multi-a
+            /tmp/cache-multi-b
+          key: test-multi-paths-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Assert cache-hit is not true (no prior cache)
         env:
@@ -32,15 +36,19 @@ jobs:
           # Under act, cache service may not be available; action may exit early or fail gracefully.
           # Either way, cache-hit must NOT be "true" since no prior cache exists.
           if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false or empty (no prior cache exists)"
+            echo "FAIL: expected cache-hit to be false or empty (no prior cache)"
             exit 1
           fi
           echo "PASS: cache-hit is not true as expected (value: '$CACHE_HIT', outcome: '$OUTCOME')"
 
-      - name: Assert cached file still exists
+      - name: Assert both files still exist
         run: |
-          if [ ! -f /tmp/cache-test/data.txt ]; then
-            echo "FAIL: cached file should still exist after cache miss"
+          if [ ! -f /tmp/cache-multi-a/a.txt ]; then
+            echo "FAIL: file a should still exist"
             exit 1
           fi
-          echo "PASS: file exists"
+          if [ ! -f /tmp/cache-multi-b/b.txt ]; then
+            echo "FAIL: file b should still exist"
+            exit 1
+          fi
+          echo "PASS: both files exist"

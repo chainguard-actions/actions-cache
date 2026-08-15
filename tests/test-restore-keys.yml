@@ -4,40 +4,47 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/act-harness
+      GITHUB_EVENT_NAME: push
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Ensure Node.js 24 is available
-        run: |
-          if ! node --version 2>/dev/null | grep -q "^v24"; then
-            curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
-            apt-get install -y nodejs
-          fi
-          node --version
+
       - name: Create a file to cache
         run: |
-          mkdir -p /tmp/cache-restore-test
-          echo "restore keys test" > /tmp/cache-restore-test/data.txt
+          mkdir -p /tmp/cache-restore-keys-test
+          echo "restore keys test" > /tmp/cache-restore-keys-test/data.txt
+
       - id: cache
         uses: .
-        with:
-          path: /tmp/cache-restore-test
-          key: test-restore-key-${{ runner.os }}-v2
-          restore-keys: |
-            test-restore-key-${{ runner.os }}-
-            test-restore-key-
         continue-on-error: true
-      - name: Assert cache-hit is false (no cache in act environment)
+        with:
+          path: /tmp/cache-restore-keys-test
+          key: test-restore-keys-primary-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            test-restore-keys-fallback-
+            test-restore-keys-
+
+      - name: Assert cache-hit is not true (no prior cache with these keys)
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
-          STEP_OUTCOME: ${{ steps.cache.outcome }}
+          OUTCOME: ${{ steps.cache.outcome }}
         run: |
-          echo "cache-hit: '$CACHE_HIT'"
-          echo "step outcome: '$STEP_OUTCOME'"
-          # Under act, cache service is unavailable so cache-hit should be false or empty.
-          # A partial match via restore-keys also returns cache-hit=false.
-          # The action may error (outcome=failure) which is also acceptable.
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          # No prior cache exists, so cache-hit should be false or empty.
+          # Under act, cache service may not be available; action may exit early.
+          # Either way, cache-hit must NOT be "true".
           if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false or empty in act environment"
+            echo "FAIL: expected cache-hit to be false or empty (no prior cache)"
             exit 1
           fi
-          echo "PASS: restore-keys mode returned expected miss result"
+          echo "PASS: cache-hit is not true as expected (value: '$CACHE_HIT', outcome: '$OUTCOME')"
+
+      - name: Assert file still exists after cache miss with restore-keys
+        run: |
+          if [ ! -f /tmp/cache-restore-keys-test/data.txt ]; then
+            echo "FAIL: file should still exist after cache miss"
+            exit 1
+          fi
+          echo "PASS: file exists"
