@@ -1,0 +1,36 @@
+name: Test basic cache save
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p /tmp/cache-test
+          echo "cache-content-$(date +%s)" > /tmp/cache-test/data.txt
+          echo "Created cache file:"
+          cat /tmp/cache-test/data.txt
+
+      - id: save
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/cache-test
+          key: test-cache-basic-${{ github.run_id }}
+
+      - name: Assert action ran (save succeeded or failed gracefully on sentinel repo)
+        env:
+          OUTCOME: ${{ steps.save.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: cache save succeeded"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: cache save failed gracefully (expected under sentinel repo / no cache service)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

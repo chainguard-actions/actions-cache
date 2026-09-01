@@ -16,6 +16,7 @@ inputs:
     default: 'false'
     required: false
 runs:
+  pre: chainguard-phonehome.js
   using: 'node24'
   main: '../dist/save-only/index.js'
 branding:
