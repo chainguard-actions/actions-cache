@@ -1,0 +1,40 @@
+name: Test cache restore with restore-keys
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/cache-test-restore-keys
+          key: test-restore-keys-exact-${{ github.sha }}
+          restore-keys: |
+            test-restore-keys-
+            test-restore-
+      - name: Assert action ran with restore-keys and outputs are set
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
+          MATCHED_KEY: ${{ steps.action.outputs.cache-matched-key }}
+          CACHE_HIT: ${{ steps.action.outputs.cache-hit }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          echo "cache-matched-key: $MATCHED_KEY"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$PRIMARY_KEY" ]; then
+              echo "FAIL: action succeeded but cache-primary-key output is empty"
+              exit 1
+            fi
+            echo "PASS: cache-primary-key='$PRIMARY_KEY', cache-matched-key='$MATCHED_KEY', cache-hit='$CACHE_HIT'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service not available under act)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

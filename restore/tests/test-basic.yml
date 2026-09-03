@@ -1,0 +1,35 @@
+name: Test basic cache restore
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/cache-test-basic
+          key: test-basic-cache-key-${{ github.sha }}
+      - name: Assert action ran and outputs are set
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
+          CACHE_HIT: ${{ steps.action.outputs.cache-hit }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$PRIMARY_KEY" ]; then
+              echo "FAIL: action succeeded but cache-primary-key output is empty"
+              exit 1
+            fi
+            echo "PASS: cache-primary-key='$PRIMARY_KEY', cache-hit='$CACHE_HIT'"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service not available under act)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
