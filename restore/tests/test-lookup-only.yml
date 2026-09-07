@@ -6,31 +6,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - id: action
+      - id: restore
         uses: .
         continue-on-error: true
         with:
-          path: /tmp/cache-test-lookup
-          key: test-lookup-only-${{ github.sha }}
+          path: /tmp/test-cache-lookup-only
+          key: test-lookup-only-${{ github.run_id }}
+          fail-on-cache-miss: 'false'
           lookup-only: 'true'
-      - name: Assert action ran in lookup-only mode
+      - name: Assert lookup-only outputs
         env:
-          OUTCOME: ${{ steps.action.outcome }}
-          PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
-          CACHE_HIT: ${{ steps.action.outputs.cache-hit }}
+          CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+          PRIMARY_KEY: ${{ steps.restore.outputs.cache-primary-key }}
+          OUTCOME: ${{ steps.restore.outcome }}
         run: |
           echo "outcome: $OUTCOME"
-          echo "cache-primary-key: $PRIMARY_KEY"
           echo "cache-hit: $CACHE_HIT"
-          if [ "$OUTCOME" = "success" ]; then
-            if [ -z "$PRIMARY_KEY" ]; then
-              echo "FAIL: action succeeded but cache-primary-key output is empty"
-              exit 1
-            fi
-            echo "PASS: lookup-only mode succeeded, cache-primary-key='$PRIMARY_KEY', cache-hit='$CACHE_HIT'"
-          elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (cache service not available under act)"
-          else
+          echo "cache-primary-key: $PRIMARY_KEY"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service may not be available in harness)"
+            exit 0
+          fi
+          if [ "$OUTCOME" != "success" ]; then
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi
+          # In lookup-only mode, no files are downloaded even on a hit
+          # On a miss, cache-hit should be false/empty
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "WARN: unexpected cache hit for unique key in lookup-only mode"
+          else
+            echo "PASS: cache miss as expected in lookup-only mode"
+          fi
+          # cache-primary-key should be set
+          if [ -z "$PRIMARY_KEY" ]; then
+            echo "FAIL: cache-primary-key output is empty"
+            exit 1
+          fi
+          echo "PASS: lookup-only mode completed, primary-key='$PRIMARY_KEY'"

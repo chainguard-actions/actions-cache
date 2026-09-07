@@ -6,35 +6,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - id: action
+      - id: restore
         uses: .
         continue-on-error: true
         with:
-          path: /tmp/cache-test-restore-keys
-          key: test-restore-keys-exact-${{ github.sha }}
+          path: /tmp/test-cache-restore-keys
+          key: test-restore-keys-exact-${{ github.run_id }}
           restore-keys: |
+            test-restore-keys-prefix-
             test-restore-keys-
-            test-restore-
-      - name: Assert action ran with restore-keys and outputs are set
+      - name: Assert restore-keys scenario outputs
         env:
-          OUTCOME: ${{ steps.action.outcome }}
-          PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
-          MATCHED_KEY: ${{ steps.action.outputs.cache-matched-key }}
-          CACHE_HIT: ${{ steps.action.outputs.cache-hit }}
+          CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+          PRIMARY_KEY: ${{ steps.restore.outputs.cache-primary-key }}
+          MATCHED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
+          OUTCOME: ${{ steps.restore.outcome }}
         run: |
           echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
           echo "cache-primary-key: $PRIMARY_KEY"
           echo "cache-matched-key: $MATCHED_KEY"
-          echo "cache-hit: $CACHE_HIT"
-          if [ "$OUTCOME" = "success" ]; then
-            if [ -z "$PRIMARY_KEY" ]; then
-              echo "FAIL: action succeeded but cache-primary-key output is empty"
-              exit 1
-            fi
-            echo "PASS: cache-primary-key='$PRIMARY_KEY', cache-matched-key='$MATCHED_KEY', cache-hit='$CACHE_HIT'"
-          elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (cache service not available under act)"
-          else
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service may not be available in harness)"
+            exit 0
+          fi
+          if [ "$OUTCOME" != "success" ]; then
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi
+          # cache-primary-key should always be set to the exact key provided
+          if [ -z "$PRIMARY_KEY" ]; then
+            echo "FAIL: cache-primary-key output is empty"
+            exit 1
+          fi
+          echo "PASS: cache-primary-key is '$PRIMARY_KEY'"
+          # On a cache miss with no matching restore-keys, cache-hit should be false/empty
+          # and cache-matched-key may be empty
+          echo "PASS: restore-keys scenario completed successfully"
