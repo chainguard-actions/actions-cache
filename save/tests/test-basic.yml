@@ -12,22 +12,22 @@ jobs:
           mkdir -p /tmp/cache-test
           echo "hello cache" > /tmp/cache-test/data.txt
 
-      - id: action
+      - id: cache-save
         uses: .
         continue-on-error: true
         with:
           path: /tmp/cache-test
-          key: test-cache-key-${{ github.run_id }}
+          key: test-cache-basic-${{ github.sha }}
 
-      - name: Assert action ran (succeeded or failed gracefully on sentinel repo)
+      - name: Assert action ran (succeeded or failed gracefully without cache service)
         env:
-          OUTCOME: ${{ steps.action.outcome }}
+          OUTCOME: ${{ steps.cache-save.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           if [ "$OUTCOME" = "success" ]; then
             echo "PASS: cache save succeeded"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (expected in harness environment)"
+            echo "PASS: action failed gracefully (cache service not available under act)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1

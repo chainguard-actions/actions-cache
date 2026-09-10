@@ -2,6 +2,7 @@
   "owner": "actions",
   "repo": "cache",
   "version": "v6.1.0",
+  "path": "save",
   "commit_sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
   "url": "https://github.com/actions/cache",
   "policy_sha": "d636be7e43ef829af6e853da6b3c7566db9f72fe",
