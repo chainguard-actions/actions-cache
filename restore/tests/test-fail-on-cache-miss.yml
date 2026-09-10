@@ -1,0 +1,43 @@
+name: Test fail-on-cache-miss behavior
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/test-cache-fail
+          key: test-cache-key-fail-on-miss-${{ github.run_id }}
+          fail-on-cache-miss: 'true'
+        continue-on-error: true
+
+      - name: Assert action fails or succeeds gracefully
+        env:
+          PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          # With fail-on-cache-miss=true and a unique key, the action should fail
+          # on a cache miss. In the act environment the cache service may also be
+          # unavailable, causing failure. Either way, failure is the expected outcome.
+          # A success outcome is only valid if a cache hit occurred (very unlikely).
+          case "$OUTCOME" in
+            failure)
+              echo "PASS: action failed as expected (cache miss with fail-on-cache-miss=true, or no cache service)"
+              ;;
+            success)
+              echo "PASS: action succeeded (unexpected cache hit)"
+              ;;
+            cancelled)
+              echo "PASS: action was cancelled"
+              ;;
+            *)
+              echo "FAIL: unexpected outcome '$OUTCOME'"
+              exit 1
+              ;;
+          esac

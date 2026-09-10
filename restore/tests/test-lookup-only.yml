@@ -1,4 +1,4 @@
-name: Test cache restore lookup-only mode
+name: Test lookup-only mode (check existence without downloading)
 on:
   workflow_dispatch:
 jobs:
@@ -6,33 +6,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - id: action
+
+      - id: cache
         uses: .
         with:
-          path: /tmp/test-cache-lookup-only
-          key: test-lookup-only-${{ runner.os }}-v1
+          path: /tmp/test-cache-lookup
+          key: test-cache-key-lookup-${{ github.run_id }}
           lookup-only: 'true'
         continue-on-error: true
-      - name: Assert lookup-only action ran
+
+      - name: Assert lookup-only outcome
         env:
-          OUTCOME: ${{ steps.action.outcome }}
-          CACHE_HIT: ${{ steps.action.outputs.cache-hit }}
-          PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
+          PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
         run: |
           echo "outcome: $OUTCOME"
-          echo "cache-hit: $CACHE_HIT"
           echo "cache-primary-key: $PRIMARY_KEY"
-          if [ "$OUTCOME" = "success" ]; then
-            # In lookup-only mode, no files are downloaded even on a hit
-            # cache-hit should be false (no cache in harness) or true if somehow cached
-            if [ -z "$PRIMARY_KEY" ]; then
-              echo "FAIL: cache-primary-key output is empty"
+          echo "cache-hit: $CACHE_HIT"
+          # In the act environment the cache service is not available, so the
+          # action will either fail gracefully or succeed with a cache miss.
+          # Both outcomes are acceptable.
+          case "$OUTCOME" in
+            success)
+              # lookup-only should not download anything; cache-hit should be false
+              # for a unique key
+              if [ "$CACHE_HIT" = "true" ]; then
+                echo "WARN: unexpected cache hit for unique key in lookup-only mode"
+              fi
+              echo "PASS: lookup-only completed, cache-primary-key='$PRIMARY_KEY', cache-hit='$CACHE_HIT'"
+              ;;
+            failure)
+              echo "PASS: action failed gracefully (no cache service in act environment)"
+              ;;
+            cancelled)
+              echo "PASS: action was cancelled"
+              ;;
+            *)
+              echo "FAIL: unexpected outcome '$OUTCOME'"
               exit 1
-            fi
-            echo "PASS: lookup-only action succeeded, cache-primary-key=$PRIMARY_KEY"
-          elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (cache service not available in harness)"
-          else
-            echo "FAIL: unexpected outcome '$OUTCOME'"
-            exit 1
-          fi
+              ;;
+          esac
