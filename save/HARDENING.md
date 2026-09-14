@@ -1,6 +1,6 @@
 <!-- markdownlint-disable -->
 
-# Hardening Report: actions--cache/v5.1.0
+# Hardening Report: actions--cache--save/v5.1.0
 
 > This file was generated automatically by the hardening agent.
 
@@ -10,5 +10,5 @@
 
 **Harden Agent Version:** `2`
 
-Action **actions--cache/v5.1.0** was hardened automatically. 0 finding(s) were identified and resolved across 0 iteration(s).
+Action **actions--cache--save/v5.1.0** was hardened automatically. 0 finding(s) were identified and resolved across 0 iteration(s).
 
