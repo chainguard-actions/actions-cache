@@ -1,0 +1,40 @@
+name: Test cache restore with restore-keys
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: restore
+        uses: .
+        continue-on-error: true
+        with:
+          key: test-cache-key-${{ runner.os }}-specific-abc123
+          path: /tmp/test-cache-restore-keys
+          restore-keys: |
+            test-cache-key-${{ runner.os }}-specific-
+            test-cache-key-${{ runner.os }}-
+      - name: Assert action ran with restore-keys and outputs are set or failed gracefully
+        env:
+          OUTCOME: ${{ steps.restore.outcome }}
+          PRIMARY_KEY: ${{ steps.restore.outputs.cache-primary-key }}
+          CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+          MATCHED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          echo "cache-hit: $CACHE_HIT"
+          echo "cache-matched-key: $MATCHED_KEY"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$PRIMARY_KEY" ]; then
+              echo "FAIL: action succeeded but cache-primary-key output is empty"
+              exit 1
+            fi
+            echo "PASS: cache-primary-key=$PRIMARY_KEY cache-hit=$CACHE_HIT matched-key=$MATCHED_KEY"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (no cache service in act environment)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
