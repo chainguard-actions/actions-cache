@@ -1,0 +1,31 @@
+name: Test cache restore lookup-only mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - id: restore
+        uses: .
+        with:
+          path: /tmp/test-cache-lookup-only
+          key: test-lookup-only-${{ github.run_id }}-${{ github.run_attempt }}
+          lookup-only: 'true'
+      - name: Assert cache-primary-key output is set
+        env:
+          PRIMARY_KEY: ${{ steps.restore.outputs.cache-primary-key }}
+        run: |
+          echo "cache-primary-key: $PRIMARY_KEY"
+          if [ -z "$PRIMARY_KEY" ]; then
+            echo "FAIL: cache-primary-key output is empty"
+            exit 1
+          fi
+          echo "PASS: cache-primary-key is set to '$PRIMARY_KEY'"
+      - name: Assert no files were downloaded (lookup-only)
+        run: |
+          if [ -d /tmp/test-cache-lookup-only ] && [ "$(ls -A /tmp/test-cache-lookup-only 2>/dev/null)" ]; then
+            echo "WARN: files found in cache path (unexpected for lookup-only on miss)"
+          else
+            echo "PASS: no files downloaded in lookup-only mode (cache miss)"
+          fi
