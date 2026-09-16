@@ -1,4 +1,4 @@
-name: Test cache save with upload chunk size
+name: Test cache save with cross-OS archive enabled
 on:
   workflow_dispatch:
 jobs:
@@ -7,27 +7,26 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Create files to cache
+      - name: Create a file to cache
         run: |
-          mkdir -p /tmp/chunk-cache-test
-          dd if=/dev/urandom bs=1024 count=512 of=/tmp/chunk-cache-test/bigfile.bin 2>/dev/null
-          echo "chunk size test" > /tmp/chunk-cache-test/meta.txt
+          mkdir -p /tmp/cross-os-cache-test
+          echo "cross-os cache content" > /tmp/cross-os-cache-test/data.txt
 
       - id: save
         uses: .
         continue-on-error: true
         with:
-          path: /tmp/chunk-cache-test
-          key: test-chunk-cache-${{ github.sha }}
-          upload-chunk-size: 524288
+          path: /tmp/cross-os-cache-test
+          key: test-cross-os-cache-${{ github.sha }}
+          enableCrossOsArchive: 'true'
 
-      - name: Assert action ran with chunk size parameter
+      - name: Assert action ran with cross-OS archive enabled
         env:
           OUTCOME: ${{ steps.save.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           if [ "$OUTCOME" = "success" ]; then
-            echo "PASS: cache save with upload-chunk-size succeeded"
+            echo "PASS: cache save with enableCrossOsArchive=true succeeded"
           elif [ "$OUTCOME" = "failure" ]; then
             echo "PASS: cache save failed gracefully (cache service not available under act)"
           else

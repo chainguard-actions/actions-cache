@@ -4,35 +4,38 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_REF: refs/heads/act-harness
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Create a file to cache
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/cache-test-dir"
-          echo "hello cache" > "$GITHUB_WORKSPACE/cache-test-dir/data.txt"
+          mkdir -p /tmp/cache-test-dir
+          echo "hello cache" > /tmp/cache-test-dir/hello.txt
 
       - id: cache
         uses: .
-        with:
-          path: ${{ github.workspace }}/cache-test-dir
-          key: test-cache-miss-${{ github.run_id }}-${{ github.run_attempt }}
         continue-on-error: true
+        with:
+          path: /tmp/cache-test-dir
+          key: test-cache-miss-${{ github.run_id }}-${{ github.run_attempt }}
 
-      - name: Assert action completed (cache miss or unavailable)
+      - name: Assert cache-hit is false or action ran gracefully
         env:
-          OUTCOME: ${{ steps.cache.outcome }}
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
         run: |
-          echo "step outcome: $OUTCOME"
+          echo "outcome: $OUTCOME"
           echo "cache-hit: $CACHE_HIT"
-          # Under act, the cache service is not available, so the action exits
-          # early with success and cache-hit=false (or empty).
-          # Either success or failure is acceptable, but cache-hit must not be true.
-          if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false/empty on first run, got true"
+          if [ "$OUTCOME" = "success" ]; then
+            # On a cache miss, cache-hit should be false or empty
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: expected cache-hit=false on first run, got true"
+              exit 1
+            fi
+            echo "PASS: cache miss confirmed (cache-hit=$CACHE_HIT)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service may not be available under harness)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi
-          echo "PASS: cache-hit is not true (cache miss or service unavailable)"

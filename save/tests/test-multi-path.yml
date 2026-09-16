@@ -1,4 +1,4 @@
-name: Test cache save with upload chunk size
+name: Test cache save with multiple paths
 on:
   workflow_dispatch:
 jobs:
@@ -7,27 +7,29 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Create files to cache
+      - name: Create multiple directories to cache
         run: |
-          mkdir -p /tmp/chunk-cache-test
-          dd if=/dev/urandom bs=1024 count=512 of=/tmp/chunk-cache-test/bigfile.bin 2>/dev/null
-          echo "chunk size test" > /tmp/chunk-cache-test/meta.txt
+          mkdir -p /tmp/multi-cache-a
+          echo "path A content" > /tmp/multi-cache-a/a.txt
+          mkdir -p /tmp/multi-cache-b
+          echo "path B content" > /tmp/multi-cache-b/b.txt
 
       - id: save
         uses: .
         continue-on-error: true
         with:
-          path: /tmp/chunk-cache-test
-          key: test-chunk-cache-${{ github.sha }}
-          upload-chunk-size: 524288
+          path: |
+            /tmp/multi-cache-a
+            /tmp/multi-cache-b
+          key: test-multi-path-cache-${{ github.sha }}
 
-      - name: Assert action ran with chunk size parameter
+      - name: Assert action ran with multiple paths
         env:
           OUTCOME: ${{ steps.save.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           if [ "$OUTCOME" = "success" ]; then
-            echo "PASS: cache save with upload-chunk-size succeeded"
+            echo "PASS: cache save with multiple paths succeeded"
           elif [ "$OUTCOME" = "failure" ]; then
             echo "PASS: cache save failed gracefully (cache service not available under act)"
           else

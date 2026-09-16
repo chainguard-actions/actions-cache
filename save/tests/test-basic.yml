@@ -6,25 +6,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
       - name: Create a file to cache
         run: |
           mkdir -p /tmp/cache-test
           echo "hello cache" > /tmp/cache-test/data.txt
-      - id: action
+
+      - id: save
         uses: .
         continue-on-error: true
         with:
           path: /tmp/cache-test
-          key: test-cache-key-${{ github.run_id }}
-      - name: Assert action ran (cache save may fail without cache service)
+          key: test-basic-cache-${{ github.sha }}
+
+      - name: Assert action ran (succeeded or failed gracefully without cache service)
         env:
-          OUTCOME: ${{ steps.action.outcome }}
+          OUTCOME: ${{ steps.save.outcome }}
         run: |
           echo "outcome: $OUTCOME"
           if [ "$OUTCOME" = "success" ]; then
             echo "PASS: cache save succeeded"
           elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (cache service not available under act)"
+            echo "PASS: cache save failed gracefully (cache service not available under act)"
           else
             echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
