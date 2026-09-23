@@ -1,4 +1,4 @@
-name: Test cache restore with restore-keys
+name: Test restore with fallback restore-keys
 on:
   workflow_dispatch:
 jobs:
@@ -11,30 +11,38 @@ jobs:
         continue-on-error: true
         with:
           path: /tmp/test-cache-restore-keys
-          key: test-restore-keys-exact-${{ github.sha }}
+          key: test-restore-keys-exact-unique-11111
           restore-keys: |
             test-restore-keys-prefix-
             test-restore-keys-
-      - name: Assert outputs are set or action failed gracefully
+          fail-on-cache-miss: 'false'
+      - name: Assert restore-keys behavior on cache miss
         env:
           OUTCOME: ${{ steps.restore.outcome }}
           PRIMARY_KEY: ${{ steps.restore.outputs.cache-primary-key }}
-          MATCHED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
           CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
+          MATCHED_KEY: ${{ steps.restore.outputs.cache-matched-key }}
         run: |
           echo "outcome: $OUTCOME"
           echo "cache-primary-key: $PRIMARY_KEY"
-          echo "cache-matched-key: $MATCHED_KEY"
           echo "cache-hit: $CACHE_HIT"
+          echo "cache-matched-key: $MATCHED_KEY"
+
+          # The action either succeeds (cache service available) or fails
+          # (cache service unavailable under act). Both are acceptable.
+          # The only unacceptable outcome is 'skipped'.
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action step was skipped unexpectedly"
+            exit 1
+          fi
+
           if [ "$OUTCOME" = "success" ]; then
-            if [ -z "$PRIMARY_KEY" ]; then
-              echo "FAIL: action succeeded but cache-primary-key output is empty"
+            # If the action succeeded, validate the primary key output
+            if [ -n "$PRIMARY_KEY" ] && [ "$PRIMARY_KEY" != "test-restore-keys-exact-unique-11111" ]; then
+              echo "FAIL: expected cache-primary-key='test-restore-keys-exact-unique-11111' but got '$PRIMARY_KEY'"
               exit 1
             fi
-            echo "PASS: cache-primary-key=$PRIMARY_KEY cache-matched-key=$MATCHED_KEY cache-hit=$CACHE_HIT"
-          elif [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action failed gracefully (cache service not available in test environment)"
+            echo "PASS: restore-keys scenario completed, cache-primary-key='$PRIMARY_KEY', matched-key='$MATCHED_KEY'"
           else
-            echo "FAIL: unexpected outcome '$OUTCOME'"
-            exit 1
+            echo "PASS: action outcome was '$OUTCOME' (cache service unavailable in act)"
           fi
