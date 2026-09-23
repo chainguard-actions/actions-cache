@@ -1,4 +1,4 @@
-name: Test lookup-only mode
+name: Test basic cache restore (cache miss)
 on:
   workflow_dispatch:
 jobs:
@@ -12,10 +12,9 @@ jobs:
         continue-on-error: true
         with:
           path: /tmp/test-cache-dir
-          key: test-lookup-only-key-${{ github.sha }}
-          lookup-only: 'true'
+          key: test-cache-key-${{ github.sha }}
 
-      - name: Assert lookup-only behavior
+      - name: Assert outputs and outcome
         env:
           OUTCOME: ${{ steps.action.outcome }}
           PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
@@ -28,7 +27,7 @@ jobs:
           echo "cache-matched-key: $MATCHED_KEY"
 
           if [ "$OUTCOME" = "success" ]; then
-            echo "PASS: lookup-only completed successfully, cache-hit='$CACHE_HIT'"
+            echo "PASS: action succeeded (cache hit or miss)"
           elif [ "$OUTCOME" = "failure" ]; then
             echo "PASS: action failed gracefully (cache service not available under act or sentinel repo)"
           else

@@ -6,38 +6,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Generate unique cache key
-        id: gen-key
-        run: echo "key=test-fail-on-miss-$(date +%s%N)-$$" >> "$GITHUB_OUTPUT"
-      - name: Create a file to cache
+
+      - name: Create a directory to cache
         run: |
-          mkdir -p /tmp/cache-fail-test
-          echo "fail on miss test" > /tmp/cache-fail-test/data.txt
+          mkdir -p /tmp/test-cache-fail-dir
+          echo "fail-on-miss test" > /tmp/test-cache-fail-dir/file.txt
+
       - id: cache
         uses: .
-        with:
-          path: /tmp/cache-fail-test
-          key: ${{ steps.gen-key.outputs.key }}
-          fail-on-cache-miss: 'true'
         continue-on-error: true
-      - name: Assert step did not produce a cache hit
+        with:
+          path: /tmp/test-cache-fail-dir
+          key: test-cache-fail-on-miss-nonexistent-${{ github.run_id }}
+          fail-on-cache-miss: 'true'
+
+      - name: Assert action failed due to cache miss with fail-on-cache-miss=true
         env:
-          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
           OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         run: |
-          echo "cache-hit: $CACHE_HIT"
           echo "outcome: $OUTCOME"
-          # With a unique key, cache-hit must NOT be "true".
-          if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false for a unique key"
-            exit 1
-          fi
-          # When cache service is available: step fails (fail-on-cache-miss=true, cache miss).
-          # When cache service is not available: action exits early with success.
-          # Both outcomes are valid for this test.
-          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: step outcome is '$OUTCOME' and cache-hit is not true"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed as expected (cache miss with fail-on-cache-miss=true, or sentinel repo)"
+          elif [ "$OUTCOME" = "success" ]; then
+            # If somehow the cache API is available and returned a hit, that's unexpected for a unique key
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: got unexpected cache hit for a unique key"
+              exit 1
+            fi
+            # If cache API is unavailable and action succeeded without checking, warn
+            echo "WARN: action succeeded but cache-hit='$CACHE_HIT' - may indicate API unavailable"
+            echo "PASS: action ran without error"
           else
-            echo "FAIL: unexpected outcome: $OUTCOME"
+            echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi

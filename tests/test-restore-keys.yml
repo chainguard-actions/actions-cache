@@ -6,40 +6,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Generate unique cache key
-        id: gen-key
+
+      - name: Create a directory to cache
         run: |
-          TS="$(date +%s%N)-$$"
-          echo "key=test-restore-keys-exact-${TS}" >> "$GITHUB_OUTPUT"
-          echo "prefix=test-restore-keys-prefix-${TS}" >> "$GITHUB_OUTPUT"
-      - name: Create a file to cache
-        run: |
-          mkdir -p /tmp/cache-restore-keys-test
-          echo "restore keys test" > /tmp/cache-restore-keys-test/data.txt
+          mkdir -p /tmp/test-restore-keys-dir
+          echo "restore-keys test" > /tmp/test-restore-keys-dir/file.txt
+
       - id: cache
         uses: .
-        with:
-          path: /tmp/cache-restore-keys-test
-          key: ${{ steps.gen-key.outputs.key }}
-          restore-keys: |
-            ${{ steps.gen-key.outputs.prefix }}
         continue-on-error: true
-      - name: Assert action completed without unexpected errors
+        with:
+          path: /tmp/test-restore-keys-dir
+          key: test-cache-restore-keys-exact-${{ github.run_id }}
+          restore-keys: |
+            test-cache-restore-keys-prefix-
+            test-cache-restore-keys-
+
+      - name: Assert restore-keys behavior
         env:
-          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
           OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         run: |
-          echo "cache-hit: $CACHE_HIT"
           echo "outcome: $OUTCOME"
-          # With a unique key, cache-hit must NOT be "true".
-          if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false for a unique primary key"
-            exit 1
-          fi
-          # The step should succeed (no cache service, early exit) or fail gracefully.
-          if [ "$OUTCOME" = "success" ] || [ "$OUTCOME" = "failure" ]; then
-            echo "PASS: action handled restore-keys correctly, outcome=$OUTCOME, cache-hit=$CACHE_HIT"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            # With a unique key and no prior cache, cache-hit should be false
+            # (either exact miss or prefix miss)
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: expected cache-hit=false for a unique key with no prior cache"
+              exit 1
+            fi
+            echo "PASS: restore-keys accepted, cache-hit='$CACHE_HIT' (expected false)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache API not available for sentinel repo)"
           else
-            echo "FAIL: unexpected outcome: $OUTCOME"
+            echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi

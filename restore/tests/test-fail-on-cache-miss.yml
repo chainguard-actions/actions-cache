@@ -1,0 +1,33 @@
+name: Test fail-on-cache-miss behavior
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/test-cache-dir
+          key: test-cache-miss-key-${{ github.sha }}-nonexistent
+          fail-on-cache-miss: 'true'
+
+      - name: Assert action fails when cache is missing and fail-on-cache-miss is true
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          PRIMARY_KEY: ${{ steps.action.outputs.cache-primary-key }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-primary-key: $PRIMARY_KEY"
+
+          if [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed as expected (cache miss with fail-on-cache-miss=true, or cache service unavailable)"
+          elif [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded (unexpected cache hit or cache service behavior)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

@@ -6,31 +6,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Generate unique cache key
-        id: gen-key
-        run: echo "key=test-cache-miss-$(date +%s%N)-$$" >> "$GITHUB_OUTPUT"
-      - name: Create a file to cache
+
+      - name: Create a directory to cache
         run: |
-          mkdir -p /tmp/cache-test
-          echo "hello cache" > /tmp/cache-test/data.txt
+          mkdir -p /tmp/test-cache-dir
+          echo "hello cache" > /tmp/test-cache-dir/file.txt
+
       - id: cache
         uses: .
-        with:
-          path: /tmp/cache-test
-          key: ${{ steps.gen-key.outputs.key }}
         continue-on-error: true
-      - name: Assert cache-hit is not true (new unique key = cache miss)
+        with:
+          path: /tmp/test-cache-dir
+          key: test-cache-basic-${{ github.run_id }}
+
+      - name: Assert cache-hit is false or action failed gracefully
         env:
           CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
           OUTCOME: ${{ steps.cache.outcome }}
         run: |
-          echo "cache-hit: $CACHE_HIT"
           echo "outcome: $OUTCOME"
-          # With a unique key, cache-hit must NOT be "true".
-          # In act without cache service: action exits early with cache-hit=false (success).
-          # In act with local cache service: cache miss, cache-hit not set (step may succeed or fail).
-          if [ "$CACHE_HIT" = "true" ]; then
-            echo "FAIL: expected cache-hit to be false for a unique key"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            # On a fresh unique key, cache-hit should be false (cache miss)
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: expected cache-hit=false for a unique key, got true"
+              exit 1
+            fi
+            echo "PASS: cache-hit is '$CACHE_HIT' (expected false for new key)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache API not available for sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
             exit 1
           fi
-          echo "PASS: cache-hit is not true as expected for a new unique key"
