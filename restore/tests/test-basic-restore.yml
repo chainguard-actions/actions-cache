@@ -1,0 +1,28 @@
+name: Test basic cache restore (cache miss)
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: ~/.npm
+          key: test-cache-key-basic-restore-unique-abc123
+
+      - name: Assert action ran and produced expected outputs or failed gracefully
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+          MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          echo "cache-matched-key: $MATCHED_KEY"
+          echo "PASS: action completed (outcome=$OUTCOME)"

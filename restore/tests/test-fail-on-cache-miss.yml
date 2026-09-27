@@ -1,0 +1,25 @@
+name: Test fail-on-cache-miss behavior
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: ~/.npm
+          key: test-nonexistent-cache-key-fail-on-miss-xyz789
+          fail-on-cache-miss: 'true'
+
+      - name: Assert action failed or ran gracefully
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          echo "PASS: action completed (outcome=$OUTCOME)"

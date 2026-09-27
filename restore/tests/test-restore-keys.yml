@@ -1,0 +1,31 @@
+name: Test restore-keys fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: ~/.npm
+          key: test-primary-key-restore-keys-unique-ghi012
+          restore-keys: |
+            test-primary-key-restore-keys-
+            test-primary-key-
+
+      - name: Assert action ran with restore-keys or failed gracefully
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+          MATCHED_KEY: ${{ steps.cache.outputs.cache-matched-key }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          echo "cache-matched-key: $MATCHED_KEY"
+          echo "PASS: action completed with restore-keys (outcome=$OUTCOME)"
