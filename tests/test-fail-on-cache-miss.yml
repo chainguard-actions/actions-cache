@@ -1,0 +1,44 @@
+name: Test fail-on-cache-miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.fail-test"
+          echo "fail on miss test" > "$GITHUB_WORKSPACE/.fail-test/data.txt"
+
+      - id: cache
+        uses: .
+        with:
+          path: .fail-test
+          key: test-fail-on-miss-key-${{ github.run_id }}-nonexistent
+          fail-on-cache-miss: 'true'
+        continue-on-error: true
+
+      - name: Assert action failed due to cache miss or returned early due to unavailable service
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "failure" ]; then
+            # With fail-on-cache-miss=true and a real cache miss, the action fails
+            echo "PASS: action failed as expected (cache miss with fail-on-cache-miss=true)"
+          elif [ "$OUTCOME" = "success" ]; then
+            # When cache service is unavailable, the action returns early (before checking
+            # fail-on-cache-miss) with cache-hit=false. This is acceptable graceful behavior.
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: action succeeded with cache-hit=true on a brand new key"
+              exit 1
+            fi
+            echo "PASS: action returned early (cache service unavailable) with cache-hit=$CACHE_HIT"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

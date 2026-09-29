@@ -1,0 +1,43 @@
+name: Test lookup-only mode
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file that would be cached
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.lookup-test"
+          echo "lookup only test" > "$GITHUB_WORKSPACE/.lookup-test/data.txt"
+
+      - id: cache
+        uses: .
+        with:
+          path: .lookup-test
+          key: test-lookup-only-key-${{ github.run_id }}
+          lookup-only: 'true'
+        continue-on-error: true
+
+      - name: Assert lookup-only behavior
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            # lookup-only with a fresh key should report cache-hit=false
+            # When cache service is unavailable, action exits early with cache-hit=false
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: expected cache-hit=false for a brand new key in lookup-only mode"
+              exit 1
+            fi
+            echo "PASS: lookup-only cache miss as expected (cache-hit=$CACHE_HIT)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service not reachable under sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

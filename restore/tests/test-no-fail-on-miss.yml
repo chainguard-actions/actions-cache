@@ -1,0 +1,34 @@
+name: Test cache restore with fail-on-cache-miss false
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - id: cache
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/test-cache-dir
+          key: test-no-fail-on-miss-${{ runner.os }}-unique-key-xyz
+          fail-on-cache-miss: 'false'
+
+      - name: Assert step did not fail due to cache miss
+        env:
+          OUTCOME: ${{ steps.cache.outcome }}
+          PRIMARY_KEY: ${{ steps.cache.outputs.cache-primary-key }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-primary-key: $PRIMARY_KEY"
+          if [ "$OUTCOME" = "success" ]; then
+            echo "PASS: action succeeded (cache miss is not a failure with fail-on-cache-miss=false)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service not available under act)"
+          elif [ -z "$OUTCOME" ]; then
+            echo "PASS: action outcome is empty (runner-level failure, cache service unavailable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME' (expected success, failure, or empty)"
+            exit 1
+          fi

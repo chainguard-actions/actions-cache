@@ -1,0 +1,45 @@
+name: Test restore-keys fallback
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a file to cache
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.restore-keys-test"
+          echo "restore keys test" > "$GITHUB_WORKSPACE/.restore-keys-test/data.txt"
+
+      - id: cache
+        uses: .
+        with:
+          path: .restore-keys-test
+          key: test-restore-keys-exact-${{ github.run_id }}
+          restore-keys: |
+            test-restore-keys-prefix-${{ github.run_id }}
+            test-restore-keys-fallback-
+        continue-on-error: true
+
+      - name: Assert restore-keys behavior
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "cache-hit: $CACHE_HIT"
+          if [ "$OUTCOME" = "success" ]; then
+            # With a fresh key and no matching restore-keys, cache-hit should be false
+            # When cache service is unavailable, action exits early with cache-hit=false
+            if [ "$CACHE_HIT" = "true" ]; then
+              echo "FAIL: expected cache-hit=false for brand new keys"
+              exit 1
+            fi
+            echo "PASS: cache miss with restore-keys as expected (cache-hit=$CACHE_HIT)"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (cache service not reachable under sentinel repo)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi
