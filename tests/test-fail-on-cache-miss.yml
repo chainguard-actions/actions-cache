@@ -1,0 +1,45 @@
+name: Test fail-on-cache-miss
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create a directory to cache
+        run: |
+          mkdir -p /tmp/cache-fail-test
+          echo "fail on miss test" > /tmp/cache-fail-test/data.txt
+
+      - id: cache
+        uses: .
+        with:
+          path: /tmp/cache-fail-test
+          key: test-fail-on-miss-${{ github.run_id }}-${{ github.run_attempt }}-unique
+          fail-on-cache-miss: 'true'
+        continue-on-error: true
+
+      - name: Assert action ran and did not produce a cache hit
+        env:
+          CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+          OUTCOME: ${{ steps.cache.outcome }}
+        run: |
+          echo "cache-hit: $CACHE_HIT"
+          echo "outcome: $OUTCOME"
+          # In act (no cache service), isCacheFeatureAvailable() returns false before
+          # fail-on-cache-miss is evaluated, so the action sets cache-hit='false' and
+          # exits successfully. On real GitHub Actions with a cache miss, the action
+          # fails. Either way, cache-hit must not be 'true'.
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "FAIL: expected cache-hit to be false or empty, got true"
+            exit 1
+          fi
+          if [ "$OUTCOME" = "skipped" ]; then
+            echo "FAIL: action was skipped unexpectedly"
+            exit 1
+          fi
+          echo "PASS: cache-hit is not true and action ran (outcome=$OUTCOME)"

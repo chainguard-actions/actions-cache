@@ -1,0 +1,13 @@
+{
+  "status": "self_contained",
+  "entries": [
+    {
+      "path": "dist/restore/index.js",
+      "status": "self_contained"
+    },
+    {
+      "path": "dist/save/index.js",
+      "status": "self_contained"
+    }
+  ]
+}
